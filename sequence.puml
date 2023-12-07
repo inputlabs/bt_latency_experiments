@@ -1,0 +1,33 @@
+@startuml
+
+par
+      activate host
+      host -> host: Init, configure SPI Master
+      host -> host: Init, configure BT Host
+      host -> host: register BT call-backs
+      host -> host: BT: start listening
+      deactivate host
+
+      activate client
+      client -> client: Init, configure SPI Slave
+      client -> client: Init, configure BT HID keyboard
+end
+
+      client -> host: BT: Open connection
+      activate host
+      host -> client: BT: connected
+
+loop
+critical
+      client -> client: Start timer
+      client -> host: BT: send keycode
+      client -> client: SPI: start listening
+      deactivate client
+      
+      host -> client: SPI: send keycode
+      activate client
+      client -> client: Stop timer
+end
+end
+      
+@enduml
