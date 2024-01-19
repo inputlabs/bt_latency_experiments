@@ -158,10 +158,27 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
         case HCI_EVENT_READ_REMOTE_EXTENDED_FEATURES_COMPLETE:            // 0x23
 //          printf("HCI_EVENT_READ_REMOTE_EXTENDED_FEATURES_COMPLETE, doing nothing\n");
           break;
+        case HCI_EVENT_IO_CAPABILITY_REQUEST:                             // 0x31
+//            print("HCI_EVENT_IO_CAPABILITY_REQUEST, doing nothing\n");
+            break;
+        case HCI_EVENT_IO_CAPABILITY_RESPONSE:                             // 0x32
+//            print("HCI_EVENT_IO_CAPABILITY_RESPONSE, doing nothing\n");
+            break;
+        case HCI_EVENT_USER_CONFIRMATION_REQUEST:                          // 0x33
+//            print("HCI_EVENT_USER_CONFIRMATION_REQUEST, doing nothing\n");
+            break;
+        case HCI_EVENT_SIMPLE_PAIRING_COMPLETE:                            // 0x36
+//            print("HCI_EVENT_SIMPLE_PAIRING_COMPLETE, doing nothing\n");
+            break;
+        case HCI_EVENT_LINK_SUPERVISION_TIMEOUT_CHANGED:                   // 0x38
+//            print("HCI_EVENT_LINK_SUPERVISION_TIMEOUT_CHANGED, doing nothing\n");
+            break;
+
         case BTSTACK_EVENT_STATE:                                         // 0x60
           uint8_t state = btstack_event_state_get_state(packet);
 //          printf("BTSTACK_EVENT_STATE\n");
 //          printf("State: 0x%02x, ", state);
+
 
           switch (state) {                                                // src/hci_cmd.h
             case HCI_STATE_INITIALIZING:                                  // 0x1
