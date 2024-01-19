@@ -45,54 +45,38 @@ static enum {
     APP_CONNECTED
 } app_state = APP_BOOTING;
 
+// from USB HID Specification 1.1, Appendix B.2
+const uint8_t hid_descriptor_mouse_boot_mode[] = {
+    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+    0x09, 0x02,                    // USAGE (Mouse)
+    0xa1, 0x01,                    // COLLECTION (Application)
 
-// close to USB HID Specification 1.1, Appendix B.1
-const uint8_t hid_descriptor_keyboard[] = {
-  0x05, 0x01,                    // Usage Page (Generic Desktop)
-  0x09, 0x06,                    // Usage (Keyboard)
-  0xa1, 0x01,                    // Collection (Application)
+    0x09, 0x01,                    //   USAGE (Pointer)
+    0xa1, 0x00,                    //   COLLECTION (Physical)
 
-  // Report ID
-  0x85, REPORT_ID,               // Report ID
+    0x05, 0x09,                    //     USAGE_PAGE (Button)
+    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+    0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+    0x95, 0x03,                    //     REPORT_COUNT (3)
+    0x75, 0x01,                    //     REPORT_SIZE (1)
+    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+    0x95, 0x01,                    //     REPORT_COUNT (1)
+    0x75, 0x05,                    //     REPORT_SIZE (5)
+    0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
 
-  // Modifier byte (input)
-  0x75, 0x01,                    //   Report Size (1)
-  0x95, 0x08,                    //   Report Count (8)
-  0x05, 0x07,                    //   Usage Page (Key codes)
-  0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
-  0x29, 0xe7,                    //   Usage Maximum (Keyboard Right GUI)
-  0x15, 0x00,                    //   Logical Minimum (0)
-  0x25, 0x01,                    //   Logical Maximum (1)
-  0x81, 0x02,                    //   Input (Data, Variable, Absolute)
+    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+    0x09, 0x30,                    //     USAGE (X)
+    0x09, 0x31,                    //     USAGE (Y)
+    0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+    0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+    0x75, 0x08,                    //     REPORT_SIZE (8)
+    0x95, 0x02,                    //     REPORT_COUNT (2)
+    0x81, 0x06,                    //     INPUT (Data,Var,Rel)
 
-  // Reserved byte (input)
-  0x75, 0x01,                    //   Report Size (1)
-  0x95, 0x08,                    //   Report Count (8)
-  0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
-
-  // LED report + padding (output)
-  0x95, 0x05,                    //   Report Count (5)
-  0x75, 0x01,                    //   Report Size (1)
-  0x05, 0x08,                    //   Usage Page (LEDs)
-  0x19, 0x01,                    //   Usage Minimum (Num Lock)
-  0x29, 0x05,                    //   Usage Maximum (Kana)
-  0x91, 0x02,                    //   Output (Data, Variable, Absolute)
-
-  0x95, 0x01,                    //   Report Count (1)
-  0x75, 0x03,                    //   Report Size (3)
-  0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
-
-  // Keycodes (input)
-  0x95, 0x06,                    //   Report Count (6)
-  0x75, 0x08,                    //   Report Size (8)
-  0x15, 0x00,                    //   Logical Minimum (0)
-  0x25, 0xff,                    //   Logical Maximum (1)
-  0x05, 0x07,                    //   Usage Page (Key codes)
-  0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
-  0x29, 0xff,                    //   Usage Maximum (Reserved)
-  0x81, 0x00,                    //   Input (Data, Array)
-
-  0xc0,                          // End collection
+    0xc0,                          //   END_COLLECTION
+    0xc0                           // END_COLLECTION
 };
 
 int keycode = 4;
@@ -291,8 +275,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
 static void hid_device_setup(void){
   // allow to get found by inquiry
   gap_discoverable_control(1);
-  // use Limited Discoverable Mode; Peripheral; Keyboard as CoD
-  gap_set_class_of_device(0x2540);
+  // use Limited Discoverable Mode; Peripheral; Pointing Device as CoD
+  gap_set_class_of_device(0x2580);
   // set local name to be identified - zeroes will be replaced by actual BD ADDR
   gap_set_local_name("HID Keyboard Demo 00:00:00:00:00:00");
   // allow for role switch in general and sniff mode
@@ -317,15 +301,15 @@ static void hid_device_setup(void){
   uint8_t hid_normally_connectable = 1;
 
   hid_sdp_record_t hid_params = {
-    // hid sevice subclass 2540 Keyboard, hid counntry code 33 US
-    0x2540, 33, 
+    // hid sevice subclass 2580 Mouse, hid counntry code 33 US
+    0x2580, 33, 
     hid_virtual_cable, hid_remote_wake, 
     hid_reconnect_initiate, hid_normally_connectable,
     hid_boot_device,
     host_max_latency, host_min_timeout,
     3200,
-    hid_descriptor_keyboard,
-    sizeof(hid_descriptor_keyboard),
+    hid_descriptor_mouse_boot_mode,
+    sizeof(hid_descriptor_mouse_boot_mode),
     hid_device_name
   };
     
@@ -340,8 +324,8 @@ static void hid_device_setup(void){
   sdp_register_service(device_id_sdp_service_buffer);
 
   // HID Device
-  hid_device_init(hid_boot_device, sizeof(hid_descriptor_keyboard), hid_descriptor_keyboard);
-       
+  hid_device_init(hid_boot_device, sizeof(hid_descriptor_mouse_boot_mode), hid_descriptor_mouse_boot_mode);
+
   // register for HCI events
   hci_event_callback_registration.callback = &packet_handler;
   hci_add_event_handler(&hci_event_callback_registration);
