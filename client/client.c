@@ -79,23 +79,50 @@ const uint8_t hid_descriptor_mouse_boot_mode[] = {
     0xc0                           // END_COLLECTION
 };
 
-int keycode = 4;
+static int step;
+static const int STEPS_PER_DIRECTION = 50;
+static const int MOUSE_SPEED = 10;
+
+static struct {
+    int dx;
+    int dy;
+} directions[] = {
+    {  1,  0 },
+    {  0,  1 },
+    { -1,  0 },
+    {  0, -1 },
+};
+
 static btstack_timer_source_t timer;
 
+static int dx;
+static int dy;
+static uint8_t buttons;
+
+
 static void timer_handler(btstack_timer_source_t * ts){
-//  printf("Restarting timer with keycode %d\n", keycode);
-
-  if(keycode >= 39){ // ensuring that this does not conflict with expected keyboard inputs
-    keycode = 4;     // keys a to z (keycode 4 - 29) and 1 to 0 (30 - 39)
-  } else {
-      keycode++;
-
-  btstack_run_loop_set_timer_handler(&timer, timer_handler);
-  btstack_run_loop_set_timer(&timer, DELAY_MS);
-  btstack_run_loop_add_timer(&timer);
-
-  hid_device_request_can_send_now_event(hid_cid);
+  printf(".");
+  // simulate left click when corner reached
+  if (step % STEPS_PER_DIRECTION == 0){
+    buttons |= 1;
   }
+  // simulate move
+  int direction_index = step / STEPS_PER_DIRECTION;
+  dx += directions[direction_index].dx * MOUSE_SPEED;
+  dy += directions[direction_index].dy * MOUSE_SPEED;
+
+  // next
+  step++;
+  if (step >= STEPS_PER_DIRECTION * 4) {
+    step = 0;
+  }
+
+  // trigger send
+  hid_device_request_can_send_now_event(hid_cid);
+
+  // set next timer
+  btstack_run_loop_set_timer(ts, DELAY_MS);
+  btstack_run_loop_add_timer(ts);
 }
 
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size){
@@ -117,6 +144,9 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
           break;
         case HCI_EVENT_CONNECTION_REQUEST:                                // 0x04
 //          printf("HCI_EVENT_CONNECTION_REQUEST, doing nothing\n");
+          break;
+        case HCI_EVENT_DISCONNECTION_COMPLETE:                            // 0x05
+//            print("HCI_EVENT_DISCONNECTION_COMPLETE, doing nothing\n");
           break;
         case HCI_EVENT_ENCRYPTION_CHANGE:                                 // 0x08
 //          printf("HCI_EVENT_ENCRYPTION_CHANGE, doing nothing\n");
@@ -225,25 +255,25 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             case HID_SUBEVENT_CAN_SEND_NOW:                               // 0x04
 //	            printf("HID_SUBEVENT_CAN_SEND_NOW\n");
 
-              uint8_t report[] = { 0xa1, REPORT_ID, 0, 0, keycode, 0, 0, 0, 0, 0};
-
-//              printf("Sending report:\n");
-//              printf_hexdump(report, sizeof(report));
-//              printf("Sending keycode %d via BT and starting SPI feedback timer\n", keycode);
-
+              uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy};
 			        uint32_t tick_start = time_us_32();
               hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
+              printf("Mouse: %d/%d - buttons: %02x\n", dx, dy, buttons);
+
+              // reset
+              dx = 0;
+              dy = 0;
+              if (buttons){
+                buttons = 0;
+                hid_device_request_can_send_now_event(hid_cid);
+              }
 
 			        uint8_t in_buf[BUF_LEN];
       			  uint8_t bytes_read = 0;
 
-              spi_read_blocking(spi_default, 0, in_buf, 1);
-              if (in_buf[0] == keycode){
-                uint32_t tick_completed = time_us_32() - tick_start;
-			          printf("number of microseconds: %lu\n", tick_completed);
-              } else {
-			          printf("!!! Incorrectly received from SPI: %02x, ", in_buf[0]);
-              }
+//              spi_read_blocking(spi_default, 0, in_buf, 1);
+//              uint32_t tick_completed = time_us_32() - tick_start;
+//			        printf("number of microseconds: %lu\n", tick_completed);
 
 	            break;
             case HID_SUBEVENT_SNIFF_SUBRATING_PARAMS:     // 0x0E
@@ -278,7 +308,7 @@ static void hid_device_setup(void){
   // use Limited Discoverable Mode; Peripheral; Pointing Device as CoD
   gap_set_class_of_device(0x2580);
   // set local name to be identified - zeroes will be replaced by actual BD ADDR
-  gap_set_local_name("HID Keyboard Demo 00:00:00:00:00:00");
+  gap_set_local_name("HID Mouse Demo 00:00:00:00:00:00");
   // allow for role switch in general and sniff mode
   gap_set_default_link_policy_settings( LM_LINK_POLICY_ENABLE_ROLE_SWITCH | LM_LINK_POLICY_ENABLE_SNIFF_MODE );
   // allow for role switch on outgoing connections - this allow HID Host to become master when we re-connect to it
